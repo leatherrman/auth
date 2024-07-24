@@ -40,8 +40,7 @@ func (s *server) Delete(_ context.Context, req *user_v1.DeleteRequest) (*emptypb
 }
 
 func main() {
-	addr := ":50001"
-	lis, err := net.Listen("tcp", addr)
+	lis, err := net.Listen("tcp", "127.0.0.1:50001")
 	if err != nil {
 		log.Fatalf("Failed to create listener: %s", err.Error())
 	}
