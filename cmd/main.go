@@ -23,24 +23,32 @@ func (s *server) Create(_ context.Context, req *user_v1.CreateRequest) (*user_v1
 	return &user_v1.CreateResponse{Id: 18}, nil
 }
 
-func (s *server) Update(_ context.Context, req *user_v1.UpdateRequest) (*emptypb.Empty, error) {
-	fmt.Printf("%#v", req)
-	return nil, nil
-}
-
 func (s *server) Get(_ context.Context, req *user_v1.GetRequest) (*user_v1.GetResponse, error) {
 	fmt.Printf("%#v", req)
-	return &user_v1.GetResponse{Id: 18, Name: "katya", Email: "abcde@email.ru", Role: user_v1.Role_USER,
-		CreatedAt: timestamppb.Now(), UpdatedAt: timestamppb.Now()}, nil
+	return &user_v1.GetResponse{
+			Id:        18,
+			Name:      "katya",
+			Email:     "abcde@email.ru",
+			Role:      user_v1.Role_USER,
+			CreatedAt: timestamppb.Now(),
+			UpdatedAt: timestamppb.Now(),
+		},
+		nil
+}
+
+func (s *server) Update(_ context.Context, req *user_v1.UpdateRequest) (*emptypb.Empty, error) {
+	fmt.Printf("%#v", req)
+	return &emptypb.Empty{}, nil
 }
 
 func (s *server) Delete(_ context.Context, req *user_v1.DeleteRequest) (*emptypb.Empty, error) {
 	fmt.Printf("%#v", req)
-	return nil, nil
+	return &emptypb.Empty{}, nil
 }
 
 func main() {
-	lis, err := net.Listen("tcp", "127.0.0.1:50001")
+	address := "127.0.0.1:50001"
+	lis, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("Failed to create listener: %s", err.Error())
 	}

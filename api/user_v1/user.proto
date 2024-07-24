@@ -9,8 +9,8 @@ option go_package = "github.com/katyafirstova/auth_service/api/user_v1";
 
 service UserV1 {
     rpc Create (CreateRequest) returns (CreateResponse);
-    rpc Update (UpdateRequest) returns (google.protobuf.Empty);
     rpc Get (GetRequest) returns (GetResponse);
+    rpc Update (UpdateRequest) returns (google.protobuf.Empty);
     rpc Delete (DeleteRequest) returns (google.protobuf.Empty);
 }
 
@@ -50,10 +50,6 @@ message UpdateRequest {
     string name = 2;
     string email = 3;
     Role role = 4;
-}
-
-message UpdateResponse {
-    int64 id = 1;
 }
 
 message DeleteRequest {
