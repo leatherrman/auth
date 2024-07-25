@@ -14,6 +14,8 @@ import (
 	"github.com/katyafirstova/auth_service/pkg/user_v1"
 )
 
+const address = "127.0.0.1:50001"
+
 type server struct {
 	user_v1.UnimplementedUserV1Server
 }
@@ -47,7 +49,6 @@ func (s *server) Delete(_ context.Context, req *user_v1.DeleteRequest) (*emptypb
 }
 
 func main() {
-	address := "127.0.0.1:50001"
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("Failed to create listener: %s", err.Error())
