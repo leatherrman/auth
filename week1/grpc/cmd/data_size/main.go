@@ -6,6 +6,8 @@ import (
 
 	"github.com/brianvoe/gofakeit"
 	"google.golang.org/protobuf/proto"
+
+	desc "github.com/ArturSaga/bigtech_service/week1/grpc/pkg/note_v1"
 )
 
 func main() {
