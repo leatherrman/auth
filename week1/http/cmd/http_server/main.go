@@ -61,7 +61,7 @@ func createNoteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 	now := time.Now()
 
 	note := &Note{
