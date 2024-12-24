@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 env:
-  REGISTRY: "cr.selcloud.ru/manzo"
+  REGISTRY: "cr.selcloud.ru/olezhek28"
   IMAGE_NAME: "crud-server"
   CONTAINER_NAME: "crud-server-container"
 
@@ -27,7 +27,7 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          TAG_NAME=$(echo $GITHUB_SHA | cut -c1-7)  # Изменено на cut для получения первых 7 символов
+          TAG_NAME=$(echo $GITHUB_SHA | cut -c1-7)
           docker buildx create --use
           docker buildx build --no-cache --push --tag $REGISTRY/$IMAGE_NAME:$TAG_NAME -f Dockerfile .
 
@@ -44,21 +44,15 @@ jobs:
           key: ${{ secrets.SSHKEY }}
           envs: IMAGE_NAME, REGISTRY, GITHUB_SHA, CONTAINER_NAME
           script: |
-            # Set up variables
-            TAG_NAME=$(echo $GITHUB_SHA | cut -c1-7)  # Используем тот же метод для получения тега
-            
-            # Login into Selectel Registry
+            TAG_NAME=$(echo $GITHUB_SHA | cut -c1-7)
             echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin $REGISTRY
             
-            # Stop running container if exists
             if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
               docker stop $CONTAINER_NAME
             fi
             
-            # Remove old container if exists
             if [ "$(docker ps -aq -f status=exited -f name=$CONTAINER_NAME)" ]; then
               docker rm $CONTAINER_NAME
             fi
             
-            # Run a new container from a new image
             docker run -d -p 50051:50051 --name $CONTAINER_NAME -t $REGISTRY/$IMAGE_NAME:$TAG_NAME
