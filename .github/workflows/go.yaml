@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 env:
-  REGISTRY: "cr.selcloud.ru/manzo"
+  REGISTRY: "cr.selcloud.ru/olezhek28"
   IMAGE_NAME: "crud-server"
   CONTAINER_NAME: "crud-server-container"
 
@@ -27,9 +27,9 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          TAG_NAME=$(echo $GITHUB_SHA | head -c7)
+          TAG_NAME=$(echo $GITHUB_SHA | cut -c1-7)  # Изменено на cut для получения первых 7 символов
           docker buildx create --use
-          docker buildx build --no-cache --push --tag $REGISTRY/$IMAGE_NAME:$TAG_NAME -f microservices_course_boilerplate/Dockerfile microservices_course_boilerplate/
+          docker buildx build --no-cache --push --tag $REGISTRY/$IMAGE_NAME:$TAG_NAME -f Dockerfile .
 
   deploy-image:
     runs-on: ubuntu-latest
@@ -45,8 +45,8 @@ jobs:
           envs: IMAGE_NAME, REGISTRY, GITHUB_SHA, CONTAINER_NAME
           script: |
             # Set up variables
-            TAG_NAME=$(echo $GITHUB_SHA | head -c7)
-
+            TAG_NAME=$(echo $GITHUB_SHA | cut -c1-7)  # Используем тот же метод для получения тега
+            
             # Login into Selectel Registry
             echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin $REGISTRY
             
