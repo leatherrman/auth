@@ -10,8 +10,3 @@ docker-build-and-push:
 	docker buildx build --no-cache --platform linux/amd64 -t cr.selcloud.ru/manzo/test-server:v0.0.1 .
 	docker login -u token -p CRgAAAAAp6JuqinTqimeRiBLwtXQX5ZOSy-616Wn cr.selcloud.ru/manzo
 	docker push cr.selcloud.ru/manzo/test-server:v0.0.1
-
-//docker-build-and-push:
-//docker buildx build --no-cache --platform linux/amd64 -t cr.selcloud.ru/olezhek28/test-server:v0.0.1 .
-//docker login -u token -p CRgAAAAA6ELvdoGnA7EL4qSbkICKeDkVldDC2OOU cr.selcloud.ru/olezhek28
-//docker push cr.selcloud.ru/olezhek28/test-server:v0.0.1
