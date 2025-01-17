@@ -2,64 +2,139 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"log"
-	"net"
+	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
-	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	sq "github.com/Masterminds/squirrel"
+	"github.com/brianvoe/gofakeit"
+	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/katyafirstova/auth_service/pkg/user_v1"
 )
 
-const address = "127.0.0.1:50001"
+const (
+	dbDSN = "host=localhost port=54322 dbname=auth_db user=auth_user password=auth_password sslmode=disable"
 
-type server struct {
-	user_v1.UnimplementedUserV1Server
+	authTable                      = "auth"
+	authTableColumnId              = "id"
+	authTableColumnName            = "name"
+	authTableColumnEmail           = "email"
+	authTableColumnPassword        = "password"
+	authTableColumnPasswordConfirm = "password_confirm"
+	authTableColumnRole            = "role"
+	authTableColumnCreatedAt       = "created_at"
+	authTableColumnUpdatedAt       = "updated_at"
+)
+
+func Create(ctx context.Context, pool *pgxpool.Pool, name string, email string, password string, role user_v1.Role) {
+	builderInsert := sq.Insert(authTable).
+		PlaceholderFormat(sq.Dollar).
+		Columns(authTableColumnName, authTableColumnEmail, authTableColumnPassword, authTableColumnPasswordConfirm, authTableColumnRole).
+		Values(name, email, password, password, role).
+		Suffix("RETURNING id")
+
+	query, args, err := builderInsert.ToSql()
+	//if err != nil {
+	//	return error(err)
+	//}
+
+	var authId int64
+	err = pool.QueryRow(ctx, query, args...).Scan(&authId)
+	if err != nil {
+		log.Fatalf("Failed to insert to database: %s", err.Error())
+	}
+
+	log.Printf("Inserted query with id: %d", authId)
 }
 
-func (s *server) Create(_ context.Context, req *user_v1.CreateRequest) (*user_v1.CreateResponse, error) {
-	fmt.Printf("%#v", req)
-	return &user_v1.CreateResponse{Id: 18}, nil
+func Get(ctx context.Context, pool *pgxpool.Pool) {
+	builderSelect := sq.Select(authTableColumnId, authTableColumnName, authTableColumnEmail, authTableColumnRole,
+		authTableColumnCreatedAt, authTableColumnUpdatedAt).
+		From(authTable).
+		PlaceholderFormat(sq.Dollar).
+		OrderBy("id ASC").
+		Limit(10)
+
+	query, args, err := builderSelect.ToSql()
+	if err != nil {
+		log.Fatalf("Failed to create query: %s", err.Error())
+	}
+
+	rows, err := pool.Query(ctx, query, args...)
+	if err != nil {
+		log.Fatalf("Failed to select from database: %s", err.Error())
+	}
+
+	var authId int64
+	var name string
+	var email string
+	var role user_v1.Role
+	var createdAt time.Time
+	var updatedAt sql.NullTime
+
+	for rows.Next() {
+		err = rows.Scan(&authId, &name, &email, &role, &createdAt, &updatedAt)
+		if err != nil {
+			log.Fatalf("Failed to scan from database: %s", err.Error())
+		}
+		log.Printf("Selected query: id: #{authId}, name: #{name}, email: #{email}, role: #{role}, " +
+			"created_at: #{createdAt}, updated_at: #{updatedAt}")
+	}
+	defer rows.Close()
 }
 
-func (s *server) Get(_ context.Context, req *user_v1.GetRequest) (*user_v1.GetResponse, error) {
-	fmt.Printf("%#v", req)
-	return &user_v1.GetResponse{
-			Id:        18,
-			Name:      "katya",
-			Email:     "abcde@email.ru",
-			Role:      user_v1.Role_USER,
-			CreatedAt: timestamppb.Now(),
-			UpdatedAt: timestamppb.Now(),
-		},
-		nil
+func Update(ctx context.Context, pool *pgxpool.Pool, id int64) {
+
+	builderUpdate := sq.Update(authTable).
+		PlaceholderFormat(sq.Dollar).
+		Where(sq.Eq{authTableColumnId: id})
+
+	query, args, err := builderUpdate.ToSql()
+	if err != nil {
+		log.Fatalf("Failed to build query: %s", err.Error())
+	}
+
+	_, err = pool.Exec(ctx, query, args...)
+	if err != nil {
+		log.Fatalf("Failed to execute query: %s", err.Error())
+	}
+
+	log.Printf("Updated #{res.RowsAffected()} rows")
+
+	log.Printf("Updated query: id: #{id}, name: #{name}, email: #{email}, role: #{role}, createdAt: " +
+		"#{createdAt}, updatedAt: #{updatedAt}")
 }
 
-func (s *server) Update(_ context.Context, req *user_v1.UpdateRequest) (*emptypb.Empty, error) {
-	fmt.Printf("%#v", req)
-	return &emptypb.Empty{}, nil
-}
+func DeleteById(ctx context.Context, pool *pgxpool.Pool, id int64) {
+	builderDelete := sq.Delete(authTable).
+		PlaceholderFormat(sq.Dollar).
+		Where(sq.Eq{authTableColumnId: id})
 
-func (s *server) Delete(_ context.Context, req *user_v1.DeleteRequest) (*emptypb.Empty, error) {
-	fmt.Printf("%#v", req)
-	return &emptypb.Empty{}, nil
+	query, args, err := builderDelete.ToSql()
+	if err != nil {
+		log.Fatalf("Failed to build query: %s", err.Error())
+	}
+
+	_, err = pool.Exec(ctx, query, args...)
+	if err != nil {
+		log.Fatalf("Failed to execute query: %s", err.Error())
+	}
+
+	log.Printf("Delete query with id: #{authId}")
+	log.Printf("Updated #{res.RowsAffected()} rows")
 }
 
 func main() {
-	lis, err := net.Listen("tcp", address)
+	ctx := context.Background()
+	pool, err := pgxpool.Connect(ctx, dbDSN)
 	if err != nil {
-		log.Fatalf("Failed to create listener: %s", err.Error())
+		log.Fatalf("Failed to connect to database: %s", err.Error())
 	}
+	defer pool.Close()
 
-	grpcServer := grpc.NewServer()
-	reflection.Register(grpcServer)
-	user_v1.RegisterUserV1Server(grpcServer, &server{})
-
-	err = grpcServer.Serve(lis)
-	if err != nil {
-		log.Fatalf("Failed to serve: %s", err.Error())
-	}
+	Create(ctx, pool, gofakeit.Word(), gofakeit.Email(), gofakeit.Word(), user_v1.Role_USER)
+	Get(context.Background(), pool)
+	Update(context.Background(), pool, 1)
+	DeleteById(context.Background(), pool, 2)
 }
