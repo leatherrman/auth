@@ -10,6 +10,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	_ "github.com/brianvoe/gofakeit"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"golang.org/x/crypto/bcrypt"
@@ -26,7 +27,7 @@ const (
 	address = "127.0.0.1:50001"
 
 	authTable                = "auth"
-	authTableColumnID        = "id"
+	authTableColumnUUID      = "uuid"
 	authTableColumnName      = "name"
 	authTableColumnEmail     = "email"
 	authTableColumnPassword  = "password"
@@ -53,46 +54,46 @@ func (s *server) Create(ctx context.Context, req *user_v1.CreateRequest) (*user_
 
 	builderInsert := sq.Insert(authTable).
 		PlaceholderFormat(sq.Dollar).
-		Columns(authTableColumnName, authTableColumnEmail, authTableColumnPassword, authTableColumnRole).
-		Values(req.Name, req.Email, hashedPassword, req.Role).
-		Suffix(fmt.Sprintf("RETURNING %s", authTableColumnID))
+		Columns(authTableColumnUUID, authTableColumnName, authTableColumnEmail, authTableColumnPassword, authTableColumnRole).
+		Values(uuid.NewString(), req.Name, req.Email, hashedPassword, req.Role).
+		Suffix(fmt.Sprintf("RETURNING %s", authTableColumnUUID))
 
 	query, args, err := builderInsert.ToSql()
 	if err != nil {
 		return nil, err
 	}
 
-	var id int64
-	err = pool.QueryRow(ctx, query, args...).Scan(&id)
+	var newUUID string
+	err = pool.QueryRow(ctx, query, args...).Scan(&newUUID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &user_v1.CreateResponse{Id: id}, nil
+	return &user_v1.CreateResponse{Uuid: newUUID}, nil
 }
 
 func (s *server) Get(ctx context.Context, req *user_v1.GetRequest) (*user_v1.GetResponse, error) {
-	builderSelect := sq.Select(authTableColumnID, authTableColumnName, authTableColumnEmail, authTableColumnRole,
+	builderSelect := sq.Select(authTableColumnUUID, authTableColumnName, authTableColumnEmail, authTableColumnRole,
 		authTableColumnCreatedAt, authTableColumnUpdatedAt).
 		From(authTable).
 		PlaceholderFormat(sq.Dollar).
-		OrderBy("id ASC").
+		OrderBy(fmt.Sprintf("%s ASC", authTableColumnUUID)).
 		Limit(1).
-		Where(sq.Eq{authTableColumnID: req.Id})
+		Where(sq.Eq{authTableColumnUUID: req.Uuid})
 
 	query, args, err := builderSelect.ToSql()
 	if err != nil {
 		return nil, err
 	}
 
-	var id int64
+	var userUUID string
 	var name string
 	var email string
 	var role user_v1.Role
 	var createdAt time.Time
 	var updatedAt *time.Time
 
-	err = pool.QueryRow(ctx, query, args...).Scan(&id, &name, &email, &role, &createdAt, &updatedAt)
+	err = pool.QueryRow(ctx, query, args...).Scan(&userUUID, &name, &email, &role, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("user not found")
@@ -106,7 +107,7 @@ func (s *server) Get(ctx context.Context, req *user_v1.GetRequest) (*user_v1.Get
 	}
 
 	return &user_v1.GetResponse{
-		Id:        id,
+		Uuid:      userUUID,
 		Name:      name,
 		Email:     email,
 		Role:      role,
@@ -119,7 +120,7 @@ func (s *server) Update(ctx context.Context, req *user_v1.UpdateRequest) (*empty
 	builderUpdate := sq.Update(authTable).
 		PlaceholderFormat(sq.Dollar).
 		Set(authTableColumnUpdatedAt, time.Now()).
-		Where(sq.Eq{authTableColumnID: req.Id})
+		Where(sq.Eq{authTableColumnUUID: req.Uuid})
 
 	if req.Name != nil {
 		builderUpdate = builderUpdate.Set(authTableColumnName, req.Name.Value)
@@ -148,7 +149,7 @@ func (s *server) Update(ctx context.Context, req *user_v1.UpdateRequest) (*empty
 func (s *server) Delete(ctx context.Context, req *user_v1.DeleteRequest) (*emptypb.Empty, error) {
 	builderDelete := sq.Delete(authTable).
 		PlaceholderFormat(sq.Dollar).
-		Where(sq.Eq{authTableColumnID: req.Id})
+		Where(sq.Eq{authTableColumnUUID: req.Uuid})
 
 	query, args, err := builderDelete.ToSql()
 	if err != nil {
