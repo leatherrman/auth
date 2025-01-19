@@ -26,7 +26,7 @@ const (
 	address = "127.0.0.1:50001"
 
 	authTable                = "auth"
-	authTableColumnId        = "id"
+	authTableColumnID        = "id"
 	authTableColumnName      = "name"
 	authTableColumnEmail     = "email"
 	authTableColumnPassword  = "password"
@@ -55,7 +55,7 @@ func (s *server) Create(ctx context.Context, req *user_v1.CreateRequest) (*user_
 		PlaceholderFormat(sq.Dollar).
 		Columns(authTableColumnName, authTableColumnEmail, authTableColumnPassword, authTableColumnRole).
 		Values(req.Name, req.Email, hashedPassword, req.Role).
-		Suffix(fmt.Sprintf("RETURNING %s", authTableColumnId))
+		Suffix(fmt.Sprintf("RETURNING %s", authTableColumnID))
 
 	query, args, err := builderInsert.ToSql()
 	if err != nil {
@@ -72,13 +72,13 @@ func (s *server) Create(ctx context.Context, req *user_v1.CreateRequest) (*user_
 }
 
 func (s *server) Get(ctx context.Context, req *user_v1.GetRequest) (*user_v1.GetResponse, error) {
-	builderSelect := sq.Select(authTableColumnId, authTableColumnName, authTableColumnEmail, authTableColumnRole,
+	builderSelect := sq.Select(authTableColumnID, authTableColumnName, authTableColumnEmail, authTableColumnRole,
 		authTableColumnCreatedAt, authTableColumnUpdatedAt).
 		From(authTable).
 		PlaceholderFormat(sq.Dollar).
 		OrderBy("id ASC").
 		Limit(1).
-		Where(sq.Eq{authTableColumnId: req.Id})
+		Where(sq.Eq{authTableColumnID: req.Id})
 
 	query, args, err := builderSelect.ToSql()
 	if err != nil {
@@ -119,7 +119,7 @@ func (s *server) Update(ctx context.Context, req *user_v1.UpdateRequest) (*empty
 	builderUpdate := sq.Update(authTable).
 		PlaceholderFormat(sq.Dollar).
 		Set(authTableColumnUpdatedAt, time.Now()).
-		Where(sq.Eq{authTableColumnId: req.Id})
+		Where(sq.Eq{authTableColumnID: req.Id})
 
 	if req.Name != nil {
 		builderUpdate = builderUpdate.Set(authTableColumnName, req.Name.Value)
@@ -148,7 +148,7 @@ func (s *server) Update(ctx context.Context, req *user_v1.UpdateRequest) (*empty
 func (s *server) Delete(ctx context.Context, req *user_v1.DeleteRequest) (*emptypb.Empty, error) {
 	builderDelete := sq.Delete(authTable).
 		PlaceholderFormat(sq.Dollar).
-		Where(sq.Eq{authTableColumnId: req.Id})
+		Where(sq.Eq{authTableColumnID: req.Id})
 
 	query, args, err := builderDelete.ToSql()
 	if err != nil {
