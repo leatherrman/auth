@@ -2,7 +2,6 @@ package user
 
 import (
 	"github.com/katyafirstova/auth_service/internal/repository"
-	"github.com/katyafirstova/auth_service/internal/service"
 )
 
 type serv struct {
@@ -11,7 +10,7 @@ type serv struct {
 
 func NewService(
 	userRepository repository.UserRepository,
-) service.UserService {
+) *serv {
 	return &serv{
 		userRepository: userRepository,
 	}

@@ -13,7 +13,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/katyafirstova/auth_service/internal/model"
-	"github.com/katyafirstova/auth_service/internal/repository"
 	"github.com/katyafirstova/auth_service/internal/repository/user/converter"
 	modelRepo "github.com/katyafirstova/auth_service/internal/repository/user/model"
 )
@@ -33,7 +32,7 @@ type repo struct {
 	db *pgxpool.Pool
 }
 
-func NewRepository(db *pgxpool.Pool) repository.UserRepository {
+func NewRepository(db *pgxpool.Pool) *repo {
 	return &repo{db: db}
 }
 
