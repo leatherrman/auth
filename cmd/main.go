@@ -2,177 +2,41 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net"
-	"time"
 
-	sq "github.com/Masterminds/squirrel"
 	_ "github.com/brianvoe/gofakeit"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v4"
+	_ "github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/katyafirstova/auth_service/internal/api/user"
+	userRepository "github.com/katyafirstova/auth_service/internal/repository/user"
+	userService "github.com/katyafirstova/auth_service/internal/service/user"
 	"github.com/katyafirstova/auth_service/pkg/user_v1"
 )
 
 const (
 	dbDSN   = "host=localhost port=54322 dbname=auth_db user=auth_user password=auth_password sslmode=disable"
 	address = "127.0.0.1:50001"
-
-	authTable                = "auth"
-	authTableColumnUUID      = "uuid"
-	authTableColumnName      = "name"
-	authTableColumnEmail     = "email"
-	authTableColumnPassword  = "password"
-	authTableColumnRole      = "role"
-	authTableColumnCreatedAt = "created_at"
-	authTableColumnUpdatedAt = "updated_at"
 )
 
-var pool *pgxpool.Pool
-
-type server struct {
-	user_v1.UnimplementedUserV1Server
-}
-
-func (s *server) Create(ctx context.Context, req *user_v1.CreateRequest) (*user_v1.CreateResponse, error) {
-	if req.Password != req.PasswordConfirm {
-		return nil, errors.New("passwords are not equal")
-	}
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-
-	builderInsert := sq.Insert(authTable).
-		PlaceholderFormat(sq.Dollar).
-		Columns(authTableColumnUUID, authTableColumnName, authTableColumnEmail, authTableColumnPassword, authTableColumnRole).
-		Values(uuid.NewString(), req.Name, req.Email, hashedPassword, req.Role).
-		Suffix(fmt.Sprintf("RETURNING %s", authTableColumnUUID))
-
-	query, args, err := builderInsert.ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	var newUUID string
-	err = pool.QueryRow(ctx, query, args...).Scan(&newUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &user_v1.CreateResponse{Uuid: newUUID}, nil
-}
-
-func (s *server) Get(ctx context.Context, req *user_v1.GetRequest) (*user_v1.GetResponse, error) {
-	builderSelect := sq.Select(authTableColumnUUID, authTableColumnName, authTableColumnEmail, authTableColumnRole,
-		authTableColumnCreatedAt, authTableColumnUpdatedAt).
-		From(authTable).
-		PlaceholderFormat(sq.Dollar).
-		OrderBy(fmt.Sprintf("%s ASC", authTableColumnUUID)).
-		Limit(1).
-		Where(sq.Eq{authTableColumnUUID: req.Uuid})
-
-	query, args, err := builderSelect.ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	var userUUID string
-	var name string
-	var email string
-	var role user_v1.Role
-	var createdAt time.Time
-	var updatedAt *time.Time
-
-	err = pool.QueryRow(ctx, query, args...).Scan(&userUUID, &name, &email, &role, &createdAt, &updatedAt)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New("user not found")
-		}
-		return nil, err
-	}
-
-	var updatedAtTs *timestamppb.Timestamp
-	if updatedAt != nil {
-		updatedAtTs = timestamppb.New(*updatedAt)
-	}
-
-	return &user_v1.GetResponse{
-		Uuid:      userUUID,
-		Name:      name,
-		Email:     email,
-		Role:      role,
-		CreatedAt: timestamppb.New(createdAt),
-		UpdatedAt: updatedAtTs,
-	}, nil
-}
-
-func (s *server) Update(ctx context.Context, req *user_v1.UpdateRequest) (*emptypb.Empty, error) {
-	builderUpdate := sq.Update(authTable).
-		PlaceholderFormat(sq.Dollar).
-		Set(authTableColumnUpdatedAt, time.Now()).
-		Where(sq.Eq{authTableColumnUUID: req.Uuid})
-
-	if req.Name != nil {
-		builderUpdate = builderUpdate.Set(authTableColumnName, req.Name.Value)
-	}
-
-	if req.Email != nil {
-		builderUpdate = builderUpdate.Set(authTableColumnEmail, req.Email.Value)
-	}
-
-	if req.Role != user_v1.Role_UNKNOWN {
-		builderUpdate = builderUpdate.Set(authTableColumnRole, req.Role)
-	}
-
-	query, args, err := builderUpdate.ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = pool.Exec(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return &emptypb.Empty{}, nil
-}
-func (s *server) Delete(ctx context.Context, req *user_v1.DeleteRequest) (*emptypb.Empty, error) {
-	builderDelete := sq.Delete(authTable).
-		PlaceholderFormat(sq.Dollar).
-		Where(sq.Eq{authTableColumnUUID: req.Uuid})
-
-	query, args, err := builderDelete.ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = pool.Exec(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return &emptypb.Empty{}, nil
-}
-
 func main() {
-	var err error
-	ctx := context.Background()
+	var (
+		pool *pgxpool.Pool
+		err  error
+		ctx  = context.Background()
+	)
 
 	pool, err = pgxpool.Connect(ctx, dbDSN)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %s", err.Error())
 	}
 	defer pool.Close()
+
+	userRepo := userRepository.NewRepository(pool)
+	userServ := userService.NewService(userRepo)
 
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
@@ -181,7 +45,7 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	reflection.Register(grpcServer)
-	user_v1.RegisterUserV1Server(grpcServer, &server{})
+	user_v1.RegisterUserV1Server(grpcServer, user.NewImplementation(userServ))
 
 	err = grpcServer.Serve(lis)
 	if err != nil {

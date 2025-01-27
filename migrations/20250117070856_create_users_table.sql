@@ -1,5 +1,5 @@
 -- +goose Up
-create table auth
+create table users
 (
     uuid       uuid primary key,
     name       text      not null,
@@ -12,5 +12,6 @@ create table auth
         role in (0, 1, 2)
         )
 );
+
 -- +goose Down
-drop table auth;
+drop table users;
