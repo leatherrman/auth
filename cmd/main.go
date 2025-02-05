@@ -4,13 +4,14 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"github.com/brianvoe/gofakeit"
-	"github.com/go-chi/chi"
 	"log"
 	"math/big"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/brianvoe/gofakeit"
+	"github.com/go-chi/chi"
 )
 
 const (
