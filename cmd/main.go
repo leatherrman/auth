@@ -1,30 +1,35 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"github.com/brianvoe/gofakeit"
 	"github.com/go-chi/chi"
 	"log"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"strconv"
 	"time"
 )
 
 const (
-	baseUrl      = "localhost:8081"
+	baseURL      = "localhost:8081"
 	usersPostfix = "/users"
 	userPostfix  = usersPostfix + "/{id}"
 )
 
+// Role is ...
 type Role uint8
 
 const (
+	// AdminRole is ...
 	AdminRole Role = iota
+	// UserRole is ...
 	UserRole
 )
 
+// NewUserData is ...
 type NewUserData struct {
 	Name            string `json:"name"`
 	Email           string `json:"email"`
@@ -33,6 +38,7 @@ type NewUserData struct {
 	PasswordConfirm string `json:"password_confirm"`
 }
 
+// UserData is ...
 type UserData struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`
@@ -55,11 +61,20 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func createUser(user *NewUserData) int64 {
-	id := rand.Int63()
+	id := generateUserID()
 
 	fmt.Printf("new user data: %+v\n", *user)
 
 	return id
+}
+
+func generateUserID() int64 {
+	nBig, err := rand.Int(rand.Reader, big.NewInt(27))
+	if err != nil {
+		panic(err)
+	}
+
+	return nBig.Int64()
 }
 
 func getUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +117,14 @@ func main() {
 	r.Post(usersPostfix, createUserHandler)
 	r.Get(userPostfix, getUserHandler)
 
-	err := http.ListenAndServe(baseUrl, r)
+	server := http.Server{
+		Addr:         baseURL,
+		Handler:      r,
+		ReadTimeout:  time.Second * 5,
+		WriteTimeout: time.Second * 5,
+	}
+
+	err := server.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}
