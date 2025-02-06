@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	baseURL      = "localhost:8081"
-	usersPostfix = "/users"
-	userPostfix  = usersPostfix + "/{id}"
+	baseURL        = "localhost:8081"
+	usersPostfix   = "/users"
+	userPostfix    = usersPostfix + "/{id}"
+	defaultTimeout = time.Second * 5
 )
 
 // Role is ...
@@ -41,12 +42,12 @@ type NewUserData struct {
 
 // UserData is ...
 type UserData struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	Role      Role      `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        int64      `json:"id"`
+	Name      string     `json:"name"`
+	Email     string     `json:"email"`
+	Role      Role       `json:"role"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at"`
 }
 
 // UpdateUserData is ...
@@ -57,6 +58,11 @@ type UpdateUserData struct {
 	Role  Role   `json:"role"`
 }
 
+// ResponseUserID is ...
+type ResponseUserID struct {
+	ID int64 `json:"id"`
+}
+
 func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	newUser := &NewUserData{}
 	if err := json.NewDecoder(r.Body).Decode(newUser); err != nil {
@@ -64,26 +70,32 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := createUser(newUser)
+	id, errId := createUser(newUser)
 
-	fmt.Println("new user id:", id)
+	if errId != nil {
+		http.Error(w, "Failed to create new user", http.StatusInternalServerError)
+	}
+
+	res := ResponseUserID{ID: id}
+
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		http.Error(w, "Failed to encode new user id", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 }
 
-func createUser(user *NewUserData) int64 {
-	id := generateUserID()
+func createUser(user *NewUserData) (int64, error) {
+	nBig, err := rand.Int(rand.Reader, big.NewInt(27))
+	if err != nil {
+		return -1, err
+	}
 
 	fmt.Printf("new user data: %+v\n", *user)
 
-	return id
-}
-
-func generateUserID() int64 {
-	nBig, err := rand.Int(rand.Reader, big.NewInt(27))
-	if err != nil {
-		panic(err)
-	}
-
-	return nBig.Int64()
+	return nBig.Int64(), nil
 }
 
 func getUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -95,8 +107,13 @@ func getUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := getUser(userID)
+	if err := json.NewEncoder(w).Encode(user); err != nil {
+		http.Error(w, "Failed to encode new user", http.StatusInternalServerError)
+		return
+	}
 
-	fmt.Printf("get user: %+v\n", *user)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 }
 
 func getUser(id int64) *UserData {
@@ -108,17 +125,8 @@ func getUser(id int64) *UserData {
 		Email:     gofakeit.Email(),
 		Role:      UserRole,
 		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		UpdatedAt: nil,
 	}
-}
-
-func parseID(idStr string) (int64, error) {
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return id, nil
 }
 
 func updateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -129,13 +137,23 @@ func updateUserHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
+
 	if err := json.NewDecoder(r.Body).Decode(updatedUser); err != nil {
 		http.Error(w, "Failed to decode new user data", http.StatusBadRequest)
 		return
 	}
-	updatedUser.ID = userID
 
+	updatedUser.ID = userID
 	updateUser(updatedUser)
+	res := ResponseUserID{ID: userID}
+
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		http.Error(w, "Failed to encode updated user id", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 }
 
 func updateUser(user *UpdateUserData) {
@@ -151,10 +169,21 @@ func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deleteUser(userID)
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func deleteUser(id int64) {
 	fmt.Printf("delete user id: %v\n", id)
+}
+
+func parseID(idStr string) (int64, error) {
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return id, nil
 }
 
 func main() {
@@ -167,8 +196,8 @@ func main() {
 	server := http.Server{
 		Addr:         baseURL,
 		Handler:      r,
-		ReadTimeout:  time.Second * 5,
-		WriteTimeout: time.Second * 5,
+		ReadTimeout:  defaultTimeout,
+		WriteTimeout: defaultTimeout,
 	}
 
 	err := server.ListenAndServe()
