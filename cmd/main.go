@@ -70,9 +70,9 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, errId := createUser(newUser)
+	id, errID := createUser(newUser)
 
-	if errId != nil {
+	if errID != nil {
 		http.Error(w, "Failed to create new user", http.StatusInternalServerError)
 	}
 
@@ -90,7 +90,7 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 func createUser(user *NewUserData) (int64, error) {
 	nBig, err := rand.Int(rand.Reader, big.NewInt(27))
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	fmt.Printf("new user data: %+v\n", *user)
@@ -125,7 +125,6 @@ func getUser(id int64) *UserData {
 		Email:     gofakeit.Email(),
 		Role:      UserRole,
 		CreatedAt: time.Now(),
-		UpdatedAt: nil,
 	}
 }
 
