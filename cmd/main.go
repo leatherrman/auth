@@ -217,13 +217,40 @@ func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deleteUser(userID)
+	err = deleteUser(userID)
+	if err != nil {
+		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func deleteUser(id int) {
-	fmt.Printf("delete user id: %v\n", id)
+func deleteUser(id int) error {
+	pgDSN, ok := os.LookupEnv("PG_DSN")
+	if !ok {
+		return errors.New("PG_DSN environment variable not set")
+	}
+
+	ctx := context.Background()
+	con, err := pgx.Connect(ctx, pgDSN)
+	if err != nil {
+		return err
+	}
+	defer con.Close(ctx)
+
+	builderDelete := sq.Delete("auth").Where("id = $1", id)
+
+	query, args, err := builderDelete.ToSql()
+	if err != nil {
+		return err
+	}
+
+	_, err = con.Exec(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func parseID(idStr string) (int, error) {
