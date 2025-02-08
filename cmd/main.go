@@ -1,17 +1,20 @@
 package main
 
 import (
-	"crypto/rand"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
-	"math/big"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
-	"github.com/brianvoe/gofakeit"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/go-chi/chi"
+	"github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -42,7 +45,7 @@ type NewUserData struct {
 
 // UserData is ...
 type UserData struct {
-	ID        int64      `json:"id"`
+	ID        int        `json:"id"`
 	Name      string     `json:"name"`
 	Email     string     `json:"email"`
 	Role      Role       `json:"role"`
@@ -52,7 +55,7 @@ type UserData struct {
 
 // UpdateUserData is ...
 type UpdateUserData struct {
-	ID    int64  `json:"id"`
+	ID    int    `json:"id"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
 	Role  Role   `json:"role"`
@@ -60,7 +63,7 @@ type UpdateUserData struct {
 
 // ResponseUserID is ...
 type ResponseUserID struct {
-	ID int64 `json:"id"`
+	ID int `json:"id"`
 }
 
 func createUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -87,15 +90,37 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func createUser(user *NewUserData) (int64, error) {
-	nBig, err := rand.Int(rand.Reader, big.NewInt(27))
+func createUser(user *NewUserData) (int, error) {
+	pgDSN, ok := os.LookupEnv("PG_DSN")
+	if !ok {
+		return 0, errors.New("PG_DSN environment variable not set")
+	}
+
+	ctx := context.Background()
+	con, err := pgx.Connect(ctx, pgDSN)
+	if err != nil {
+		return 0, err
+	}
+	defer con.Close(ctx)
+
+	builderInsert := sq.Insert("auth").
+		PlaceholderFormat(sq.Dollar).
+		Columns("name", "email", "role", "password").
+		Values(user.Name, user.Email, user.Role, user.Password).
+		Suffix("RETURNING id")
+
+	query, args, err := builderInsert.ToSql()
 	if err != nil {
 		return 0, err
 	}
 
-	fmt.Printf("new user data: %+v\n", *user)
+	var userID int
+	err = con.QueryRow(ctx, query, args...).Scan(&userID)
+	if err != nil {
+		return 0, err
+	}
 
-	return nBig.Int64(), nil
+	return userID, nil
 }
 
 func getUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +131,12 @@ func getUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := getUser(userID)
+	user, err := getUser(userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if err := json.NewEncoder(w).Encode(user); err != nil {
 		http.Error(w, "Failed to encode new user", http.StatusInternalServerError)
 		return
@@ -116,16 +146,36 @@ func getUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func getUser(id int64) *UserData {
-	fmt.Printf("get user id: %v\n", id)
-
-	return &UserData{
-		ID:        id,
-		Name:      gofakeit.Name(),
-		Email:     gofakeit.Email(),
-		Role:      UserRole,
-		CreatedAt: time.Now(),
+func getUser(id int) (*UserData, error) {
+	pgDSN, ok := os.LookupEnv("PG_DSN")
+	if !ok {
+		return nil, errors.New("PG_DSN environment variable not set")
 	}
+
+	ctx := context.Background()
+	con, err := pgx.Connect(ctx, pgDSN)
+	if err != nil {
+		return nil, err
+	}
+	defer con.Close(ctx)
+
+	builderSelect := sq.Select("id", "name", "email", "role", "created_at", "updated_at").
+		From("auth").
+		PlaceholderFormat(sq.Dollar).
+		Where("id = $1", id)
+
+	query, args, err := builderSelect.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	var user = &UserData{}
+	err = con.QueryRow(ctx, query, args...).Scan(&user.ID, &user.Name, &user.Email, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func updateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -172,20 +222,21 @@ func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func deleteUser(id int64) {
+func deleteUser(id int) {
 	fmt.Printf("delete user id: %v\n", id)
 }
 
-func parseID(idStr string) (int64, error) {
+func parseID(idStr string) (int, error) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		return 0, err
 	}
 
-	return id, nil
+	return int(id), nil
 }
 
 func main() {
+	getEnv()
 	r := chi.NewRouter()
 	r.Post(usersPostfix, createUserHandler)
 	r.Get(userPostfix, getUserHandler)
@@ -202,5 +253,11 @@ func main() {
 	err := server.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func getEnv() {
+	if err := godotenv.Load(); err != nil {
+		panic(".env file not found")
 	}
 }
