@@ -159,10 +159,7 @@ func getUser(id int) (*UserData, error) {
 	}
 	defer con.Close(ctx)
 
-	builderSelect := sq.Select("id", "name", "email", "role", "created_at", "updated_at").
-		From("auth").
-		PlaceholderFormat(sq.Dollar).
-		Where("id = $1", id)
+	builderSelect := getSelectorByID(id)
 
 	query, args, err := builderSelect.ToSql()
 	if err != nil {
@@ -193,8 +190,11 @@ func updateUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updatedUser.ID = userID
-	updateUser(updatedUser)
-	res := ResponseUserID{ID: userID}
+	res, err := updateUser(updatedUser)
+	if err != nil {
+		http.Error(w, "Failed to update user", http.StatusInternalServerError)
+		return
+	}
 
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		http.Error(w, "Failed to encode updated user id", http.StatusInternalServerError)
@@ -205,8 +205,51 @@ func updateUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func updateUser(user *UpdateUserData) {
-	fmt.Printf("update user data: %+v\n", *user)
+func updateUser(user *UpdateUserData) (*UserData, error) {
+	pgDSN, ok := os.LookupEnv("PG_DSN")
+	if !ok {
+		return nil, errors.New("PG_DSN environment variable not set")
+	}
+
+	ctx := context.Background()
+	con, err := pgx.Connect(ctx, pgDSN)
+	if err != nil {
+		return nil, err
+	}
+	defer con.Close(ctx)
+
+	builderUpdate := sq.Update("auth").
+		PlaceholderFormat(sq.Dollar).
+		Set("name", user.Name).
+		Set("email", user.Email).
+		Set("role", user.Role).
+		Set("updated_at", time.Now()).
+		Where(sq.Eq{"id": user.ID})
+
+	query, args, err := builderUpdate.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = con.Query(ctx, query, args...)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+		return nil, err
+	}
+
+	builderSelect := getSelectorByID(user.ID)
+
+	query, args, err = builderSelect.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	updatedUser, err := getUser(user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedUser, nil
 }
 
 func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -238,7 +281,7 @@ func deleteUser(id int) error {
 	}
 	defer con.Close(ctx)
 
-	builderDelete := sq.Delete("auth").Where("id = $1", id)
+	builderDelete := sq.Delete("auth").Where(sq.Eq{"id": id})
 
 	query, args, err := builderDelete.ToSql()
 	if err != nil {
@@ -260,6 +303,15 @@ func parseID(idStr string) (int, error) {
 	}
 
 	return int(id), nil
+}
+
+func getSelectorByID(id int) *sq.SelectBuilder {
+	builderSelect := sq.Select("id", "name", "email", "role", "created_at", "updated_at").
+		From("auth").
+		PlaceholderFormat(sq.Dollar).
+		Where(sq.Eq{"id": id})
+
+	return &builderSelect
 }
 
 func main() {
