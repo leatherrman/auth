@@ -8,7 +8,7 @@ import (
 )
 
 func (i *Implementation) Create(ctx context.Context, req *user_v1.CreateRequest) (*user_v1.CreateResponse, error) {
-	uuid, err := i.userService.Create(ctx, converter.CreateUserToServiceFromApi(req))
+	uuid, err := i.userService.Create(ctx, converter.CreateUserToServiceFromAPI(req))
 	if err != nil {
 		return nil, err
 	}

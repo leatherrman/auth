@@ -13,5 +13,5 @@ func (i *Implementation) Get(ctx context.Context, req *user_v1.GetRequest) (*use
 		return nil, err
 	}
 
-	return converter.GetUserFromServiceToApi(user), nil
+	return converter.GetUserFromServiceToAPI(user), nil
 }

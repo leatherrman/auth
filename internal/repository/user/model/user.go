@@ -7,7 +7,7 @@ import (
 type Role int32
 
 type User struct {
-	Uuid           string     `db:"uuid"`
+	UUID           string     `db:"uuid"`
 	Name           string     `db:"name"`
 	Email          string     `db:"email"`
 	Role           Role       `db:"role"`

@@ -10,7 +10,7 @@ import (
 )
 
 func (i *Implementation) Update(ctx context.Context, req *user_v1.UpdateRequest) (*emptypb.Empty, error) {
-	err := i.userService.Update(ctx, req.Uuid, converter.UpdateUserToServiceFromApi(req))
+	err := i.userService.Update(ctx, req.Uuid, converter.UpdateUserToServiceFromAPI(req))
 	if err != nil {
 		return nil, err
 	}

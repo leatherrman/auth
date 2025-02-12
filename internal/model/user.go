@@ -7,7 +7,7 @@ import (
 type Role int32
 
 type User struct {
-	Uuid      string
+	UUID      string
 	Name      string
 	Email     string
 	Password  string

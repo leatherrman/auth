@@ -78,7 +78,7 @@ func (r *repo) Get(ctx context.Context, uuid string) (model.User, error) {
 
 	var user modelRepo.User
 
-	err = r.db.QueryRow(ctx, query, args...).Scan(&user.Uuid, &user.Name, &user.Email, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	err = r.db.QueryRow(ctx, query, args...).Scan(&user.UUID, &user.Name, &user.Email, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.User{}, errors.New("user not found")

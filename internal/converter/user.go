@@ -7,7 +7,7 @@ import (
 	desc "github.com/katyafirstova/auth_service/pkg/user_v1"
 )
 
-func CreateUserToServiceFromApi(user *desc.CreateRequest) model.CreateUser {
+func CreateUserToServiceFromAPI(user *desc.CreateRequest) model.CreateUser {
 	return model.CreateUser{
 		Name:            user.Name,
 		Email:           user.Email,
@@ -17,7 +17,7 @@ func CreateUserToServiceFromApi(user *desc.CreateRequest) model.CreateUser {
 	}
 }
 
-func UpdateUserToServiceFromApi(user *desc.UpdateRequest) model.UpdateUser {
+func UpdateUserToServiceFromAPI(user *desc.UpdateRequest) model.UpdateUser {
 	var res model.UpdateUser
 	if user.Name != nil {
 		res.Name = &user.Name.Value
@@ -35,14 +35,14 @@ func UpdateUserToServiceFromApi(user *desc.UpdateRequest) model.UpdateUser {
 	return res
 }
 
-func GetUserFromServiceToApi(user model.User) *desc.GetResponse {
+func GetUserFromServiceToAPI(user model.User) *desc.GetResponse {
 	var updatedAt *timestamppb.Timestamp
 	if user.UpdatedAt != nil {
 		updatedAt = timestamppb.New(*user.UpdatedAt)
 	}
 
 	return &desc.GetResponse{
-		Uuid:      user.Uuid,
+		Uuid:      user.UUID,
 		Name:      user.Name,
 		Email:     user.Email,
 		Role:      desc.Role(user.Role),
