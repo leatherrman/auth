@@ -11,8 +11,8 @@ import (
 func (i *Implementation) Delete(ctx context.Context, req *user_v1.DeleteRequest) (*emptypb.Empty, error) {
 	err := i.userService.Delete(ctx, req.Uuid)
 	if err != nil {
-		return nil, err
+		return &emptypb.Empty{}, err
 	}
 
-	return nil, nil
+	return &emptypb.Empty{}, nil
 }
