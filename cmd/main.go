@@ -1,11 +1,22 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"log"
 
-	"github.com/fatih/color"
+	"github.com/katyafirstova/auth_service/internal/app"
 )
 
 func main() {
-	fmt.Println(color.GreenString("Hello, world!"))
+	ctx := context.Background()
+
+	a, err := app.NewApp(ctx)
+	if err != nil {
+		log.Fatalf("failed to init app: %s", err.Error())
+	}
+
+	err = a.Run()
+	if err != nil {
+		log.Fatalf("failed to run app: %s", err.Error())
+	}
 }
